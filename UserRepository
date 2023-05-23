@@ -1,0 +1,354 @@
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Data.SqlClient;
+using System.Data;
+
+public class UserRepository
+{
+    private string connectionString = "Data Source=msi\\sqlexpress;Initial Catalog=racenet_advertising;Integrated Security=True";
+
+
+
+
+
+    public List<User> GetAllUsers()
+    {
+        List<User> users = new List<User>();
+
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            string query = "SELECT * FROM Users";
+
+            using (SqlCommand command = new SqlCommand(query, connection))
+            {
+                connection.Open();
+
+                SqlDataReader reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    User user = new User()
+                    {
+                        UserID = Convert.ToInt32(reader["UserID"]),
+                        Username = reader["Username"].ToString(),
+                        Password = reader["Password"].ToString(),
+                        Role = reader["Role"].ToString()
+                    };
+
+                    users.Add(user);
+                }
+
+                reader.Close();
+            }
+        }
+
+        return users;
+    }
+
+
+
+
+    
+   /****************
+   public void AddUser(User user)
+    {
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            string query = "INSERT INTO Users (Username, Password, Role) VALUES (@Username, @Password, @Role)";
+
+            using (SqlCommand command = new SqlCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@Username", user.Username);
+                command.Parameters.AddWithValue("@Password", user.Password);
+                command.Parameters.AddWithValue("@Role", user.Role);
+
+                connection.Open();
+
+                command.ExecuteNonQuery();
+            }
+        }
+    }
+    ****************************************/
+
+
+
+    public void AddUser(string username, string password, string role)
+    {
+        // Hash the password
+        string hashedPassword = PasswordHasher.HashPassword(password);
+
+        // Create a connection to the database
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            try
+            {
+                // Open the database connection
+                connection.Open();
+
+                // Create a SQL query to insert the user into the Users table
+                string query = "INSERT INTO Users (Username, Password, Role) VALUES (@Username, @Password, @Role)";
+
+                // Create a SqlCommand object with the query and connection
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    // Set the parameter values
+                    command.Parameters.AddWithValue("@Username", username);
+                    command.Parameters.AddWithValue("@Password", hashedPassword);
+                    command.Parameters.AddWithValue("@Role", role);
+
+                    // Execute the query
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+    }
+
+
+
+
+    public void UpdateUser(int userID, string username, string password, string role)
+    {
+        // Hash the password
+        string hashedPassword = PasswordHasher.HashPassword(password);
+
+        // Create a connection to the database
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            try
+            {
+                // Open the database connection
+                connection.Open();
+
+                // Create a SQL query to update the user in the Users table
+                string query = "UPDATE Users SET Username = @Username, Password = @Password, Role = @Role WHERE UserID = @UserID";
+
+                // Create a SqlCommand object with the query and connection
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    // Set the parameter values
+                    command.Parameters.AddWithValue("@Username", username);
+                    command.Parameters.AddWithValue("@Password", hashedPassword);
+                    command.Parameters.AddWithValue("@Role", role);
+                    command.Parameters.AddWithValue("@UserID", userID);
+
+                    // Execute the query
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+    }
+   
+
+
+
+
+    public void DeleteUser(int userID)
+    {
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            string query = "DELETE FROM Users WHERE UserID = @UserID";
+
+            using (SqlCommand command = new SqlCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@UserID", userID);
+
+                connection.Open();
+
+                command.ExecuteNonQuery();
+            }
+        }
+    }
+
+
+
+
+
+
+    /*************************************************
+    public LoginResult VerifyLogin(string username, string password)
+    {
+        LoginResult loginResult = LoginResult.InvalidCredentials;
+
+        // Create a connection to the database
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            try
+            {
+                // Open the database connection
+                connection.Open();
+
+                //Create a SQL query to retrieve the user's password and role based on the entered username
+                // string query = "SELECT Password, Role FROM Users WHERE Username = @Username";
+
+
+                // Create a SQL query to retrieve the user's password and role based on the entered username
+                string query = "SELECT Password, Role, Username FROM Users";
+
+
+                // Create a SqlCommand object with the query and connection
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    // Set the parameter value for the username
+                    command.Parameters.Add("@Username", SqlDbType.VarChar).Value = username;
+
+
+                    // Execute the query and retrieve the password and role
+                    SqlDataReader reader = command.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        string storedPassword = reader["Password"].ToString();
+                        string storedUsername = reader["Username"].ToString();
+                        string role = reader["Role"].ToString();
+
+                        // Compare the stored username with the entered username using a case-sensitive comparison
+                        // bool isUsernameValid = string.Equals(username, storedUsername, StringComparison.Ordinal);
+
+
+                        // Compare the stored password with the entered password using your password hashing method
+                       
+                        if (string.Equals(username, reader["Username"].ToString(), StringComparison.OrdinalIgnoreCase))
+                        {
+
+                            bool isPasswordValid = PasswordHasher.VerifyPassword(password, storedPassword);
+
+                            if (isPasswordValid)
+                            {
+                                // Login is valid, set the appropriate login result based on the role
+                                if (role == "admin")
+                                {
+                                    loginResult = LoginResult.Admin;
+                                }
+                                else if (role == "cashier")
+                                {
+                                    loginResult = LoginResult.Cashier;
+                                }
+                                else if (role == "staff")
+                                {
+                                    loginResult = LoginResult.Staff;
+                                }
+                                else if (role == "superadmin")
+                                {
+                                    loginResult = LoginResult.SuperAdmin;
+                                }
+                            }
+                        }
+
+                        reader.Close();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+
+        return loginResult;
+    }
+
+    *******************************************************************/
+
+
+
+    public LoginResult VerifyLogin(string username, string password)
+    {
+        LoginResult loginResult = LoginResult.InvalidCredentials;
+
+        // Create a connection to the database
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            try
+            {
+                // Open the database connection
+                connection.Open();
+
+                // Create a SQL query to retrieve the user's password and role based on the entered username
+                string query = "SELECT Password, Role, Username FROM Users WHERE Username = @Username";
+
+                // Create a SqlCommand object with the query and connection
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    // Set the parameter value for the username
+                    command.Parameters.AddWithValue("@Username", username);
+
+                    // Execute the query and retrieve the password and role
+                    SqlDataReader reader = command.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        string storedPassword = reader["Password"].ToString();
+                        string role = reader["Role"].ToString();
+
+                        // Verify the username
+                        if (string.Equals(username, reader["Username"].ToString(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Compare the stored password with the entered password using your password hashing method
+                            bool isPasswordValid = PasswordHasher.VerifyPassword(password, storedPassword);
+
+                            if (isPasswordValid)
+                            {
+                                // Login is valid, set the appropriate login result based on the role
+                                if (role == "admin")
+                                {
+                                    loginResult = LoginResult.Admin;
+                                }
+                                else if (role == "cashier")
+                                {
+                                    loginResult = LoginResult.Cashier;
+                                }
+                                else if (role == "staff")
+                                {
+                                    loginResult = LoginResult.Staff;
+                                }
+                                else if (role == "superadmin")
+                                {
+                                    loginResult = LoginResult.SuperAdmin;
+                                }
+                            }
+                        }
+                    }
+
+                    reader.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+
+        return loginResult;
+    }
+
+
+
+
+
+
+}
+
+public enum LoginResult
+{
+    InvalidCredentials,
+    Admin,
+    Cashier,
+    Staff,
+    SuperAdmin
+}
